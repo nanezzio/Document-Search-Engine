@@ -12,7 +12,7 @@
 - Компилятор с поддержкой C++17 и CMake 3.19 или новее.
 - Qt 6.5 или новее с модулями **Core**, **Widgets**, **SQL** и драйвером PostgreSQL **QPSQL**.
 - Запущенный сервер PostgreSQL и пользователь с правами создавать таблицы в выбранной базе.
-- Qt Creator для сборки и запуска по инструкции ниже. Для редактирования окна можно открыть [mainwindow.ui](mainwindow.ui) в Qt Designer.
+- Qt Creator для сборки и запуска по инструкции ниже. Для редактирования окна можно открыть [mainwindow.ui](src/searcher/mainwindow.ui) в Qt Designer.
 
 ## Подготовка PostgreSQL
 
@@ -91,12 +91,16 @@ extensions=txt,md,ini,csv
 - **QPSQL driver not loaded.** Проверьте, что драйвер QPSQL и клиентские библиотеки PostgreSQL доступны для выбранного комплекта Qt.
 - **Поисковик сообщает, что таблица не существует.** Сначала запустите `indexer` с настройками той же базы.
 
-## Файлы проекта
+## Структура проекта
 
-| Файл | Назначение |
-| --- | --- |
-| [CMakeLists.txt](CMakeLists.txt) | Описание двух исполняемых целей и общей библиотеки. |
-| [indexer.cpp](indexer.cpp) | Обход папок, подсчёт слов и запись в PostgreSQL. |
-| [main.cpp](main.cpp), [mainwindow.cpp](mainwindow.cpp) | Запуск поисковика, обработка запросов и вывод статистики. |
-| [mainwindow.ui](mainwindow.ui) | Разметка окна и вкладок в формате Qt Designer. |
-| [common.h](common.h), [common.cpp](common.cpp) | Чтение настроек, подключение к PostgreSQL и выделение слов из текста. |
+```text
+.
+├── src/
+│   ├── common/         # Настройки, подключение к PostgreSQL и разбор текста
+│   ├── indexer/        # Консольный индексатор
+│   └── searcher/       # Поисковик и форма mainwindow.ui
+├── test_documents/     # Примеры файлов для проверки
+├── CMakeLists.txt      # Точка входа для сборки в Qt Creator
+├── config.example.ini  # Шаблон настроек
+└── README.md
+```
