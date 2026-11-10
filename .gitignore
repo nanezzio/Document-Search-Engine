@@ -1,0 +1,4 @@
+/config.ini
+/build*/
+/.qtcreator/
+/CMakeLists.txt.user*

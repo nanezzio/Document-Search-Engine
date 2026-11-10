@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>760</width><height>480</height></rect>
+  </property>
+  <property name="windowTitle"><string>Поиск по документам</string></property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="mainLayout">
+    <item>
+     <widget class="QTabWidget" name="tabs">
+      <widget class="QWidget" name="searchTab">
+       <attribute name="title"><string>Поиск</string></attribute>
+       <layout class="QVBoxLayout" name="searchLayout">
+        <item>
+         <layout class="QHBoxLayout" name="queryLayout">
+          <item>
+           <widget class="QLineEdit" name="queryEdit">
+            <property name="placeholderText"><string>Введите до четырёх слов</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="searchButton">
+            <property name="text"><string>Искать</string></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QPlainTextEdit" name="resultsEdit">
+          <property name="readOnly"><bool>true</bool></property>
+          <property name="placeholderText"><string>Здесь появятся найденные документы</string></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="statisticsTab">
+       <attribute name="title"><string>Статистика</string></attribute>
+       <layout class="QVBoxLayout" name="statisticsLayout">
+        <item>
+         <layout class="QHBoxLayout" name="buttonsLayout">
+          <item>
+           <widget class="QPushButton" name="wordsButton">
+            <property name="text"><string>Слова и частоты</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="relevanceButton">
+            <property name="text"><string>Релевантность документов</string></property>
+            <property name="enabled"><bool>false</bool></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QPlainTextEdit" name="statisticsEdit">
+          <property name="readOnly"><bool>true</bool></property>
+          <property name="placeholderText"><string>Выберите, какую статистику показать</string></property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <tabstops><tabstop>queryEdit</tabstop><tabstop>searchButton</tabstop><tabstop>resultsEdit</tabstop></tabstops>
+ <resources/>
+ <connections/>
+</ui>
