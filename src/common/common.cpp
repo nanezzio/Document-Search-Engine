@@ -19,10 +19,10 @@ QString configPath()
     return QDir(QString::fromUtf8(SOURCE_DIR)).filePath("config.ini");
 }
 
-QSqlDatabase connectDatabase(const QString &path)
+QSqlDatabase connectDatabase(const QString &path, const QString &connectionName)
 {
     const QSettings settings(path, QSettings::IniFormat);
-    auto db = QSqlDatabase::addDatabase("QPSQL");
+    auto db = QSqlDatabase::addDatabase("QPSQL", connectionName);
     db.setHostName(settings.value("database/host", "localhost").toString());
     db.setPort(settings.value("database/port", 5432).toInt());
     db.setDatabaseName(settings.value("database/name", "document_search").toString());
@@ -35,13 +35,38 @@ QSqlDatabase connectDatabase(const QString &path)
 
 QStringList wordsFromText(const QString &text)
 {
+    return WordTokenizer().takeWords(text, true);
+}
+
+QStringList WordTokenizer::takeWords(const QString &text, bool endOfInput)
+{
     static const QRegularExpression wordPattern(QStringLiteral("[\\p{L}\\p{N}]+"));
+    const QString lower = text.toLower();
     QStringList words;
-    auto matches = wordPattern.globalMatch(text.toLower());
+    auto finishWord = [&] {
+        if (pendingWord.size() >= 3)
+            words.append(pendingWord);
+        pendingWord.clear();
+        wordTooLong = false;
+    };
+
+    qsizetype lastEnd = 0;
+    auto matches = wordPattern.globalMatch(lower);
     while (matches.hasNext()) {
-        const QString word = matches.next().captured();
-        if (word.size() >= 3 && word.size() <= 32)
-            words.append(word);
+        const auto match = matches.next();
+        if (match.capturedStart() > lastEnd)
+            finishWord();
+        if (!wordTooLong) {
+            if (pendingWord.size() + match.capturedLength() <= 32) {
+                pendingWord.append(match.capturedView());
+            } else {
+                pendingWord.clear();
+                wordTooLong = true;
+            }
+        }
+        lastEnd = match.capturedEnd();
     }
+    if (lastEnd < lower.size() || endOfInput)
+        finishWord();
     return words;
 }

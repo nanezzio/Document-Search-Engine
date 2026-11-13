@@ -4,7 +4,7 @@ project(DocumentSearchEngine LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Sql Widgets)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Sql Widgets Concurrent)
 qt_standard_project_setup()
 
 add_library(search_common STATIC
@@ -24,4 +24,4 @@ qt_add_executable(searcher WIN32
     src/searcher/mainwindow.h
     src/searcher/mainwindow.ui
 )
-target_link_libraries(searcher PRIVATE search_common Qt6::Widgets)
+target_link_libraries(searcher PRIVATE search_common Qt6::Widgets Qt6::Concurrent)

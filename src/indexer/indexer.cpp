@@ -4,6 +4,7 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
+#include <QFileInfo>
 #include <QHash>
 #include <QSet>
 #include <QSettings>
@@ -84,13 +85,26 @@ static bool indexFile(QSqlDatabase &db, const QString &path, QString &error)
         error = file.errorString();
         return false;
     }
-    const QString content = QString::fromUtf8(file.readAll());
+    QTextStream input(&file);
+    input.setEncoding(QStringConverter::Utf8);
+    input.setAutoDetectUnicode(false);
+    constexpr qsizetype blockSize = 64 * 1024;
+    WordTokenizer tokenizer;
+    QHash<QString, int> frequencies;
+    while (!input.atEnd()) {
+        QString block = input.read(blockSize);
+        if (block.isEmpty())
+            break;
+        if (block.back().isHighSurrogate())
+            block += input.read(1);
+        for (const QString &word : tokenizer.takeWords(block))
+            ++frequencies[word];
+    }
     if (file.error() != QFileDevice::NoError) {
         error = file.errorString();
         return false;
     }
-    QHash<QString, int> frequencies;
-    for (const QString &word : wordsFromText(content))
+    for (const QString &word : tokenizer.takeWords({}, true))
         ++frequencies[word];
 
     if (!db.transaction()) {
@@ -106,6 +120,65 @@ static bool indexFile(QSqlDatabase &db, const QString &path, QString &error)
         db.rollback();
         return false;
     }
+    return true;
+}
+
+static bool isInside(const QString &path, QString directory)
+{
+    if (!directory.endsWith('/'))
+        directory += '/';
+#ifdef Q_OS_WIN
+    return path.startsWith(directory, Qt::CaseInsensitive);
+#else
+    return path.startsWith(directory);
+#endif
+}
+
+static bool removeStaleDocuments(QSqlDatabase &db, const QStringList &roots,
+                                 const QSet<QString> &seen, qsizetype &removed, QString &error)
+{
+    if (!db.transaction()) {
+        error = db.lastError().text();
+        return false;
+    }
+
+    QSqlQuery query(db);
+    auto fail = [&](const QString &message) {
+        error = message;
+        query.finish();
+        db.rollback();
+        return false;
+    };
+    if (!query.exec("SELECT path FROM documents"))
+        return fail(query.lastError().text());
+
+    QStringList stale;
+    while (query.next()) {
+        const QString path = query.value(0).toString();
+        if (seen.contains(path))
+            continue;
+        for (const QString &root : roots) {
+            if (isInside(path, root)) {
+                stale.append(path);
+                break;
+            }
+        }
+    }
+    if (query.lastError().isValid())
+        return fail(query.lastError().text());
+    query.finish();
+
+    if (!query.prepare("DELETE FROM documents WHERE path = ?"))
+        return fail(query.lastError().text());
+    for (const QString &path : stale) {
+        query.bindValue(0, path);
+        if (!query.exec())
+            return fail(query.lastError().text());
+    }
+    query.finish();
+    if (!db.commit())
+        return fail(db.lastError().text());
+    removed = stale.size();
     return true;
 }
 
@@ -147,23 +220,48 @@ int main(int argc, char *argv[])
             << Qt::endl << db.lastError().text() << Qt::endl;
         return 1;
     }
+    // Prevent overlapping scans of the same database from pruning each other's results.
+    QSqlQuery lock(db);
+    if (!lock.exec("SELECT pg_try_advisory_lock(1842193061)") || !lock.next()) {
+        err << lock.lastError().text() << Qt::endl;
+        return 1;
+    }
+    if (!lock.value(0).toBool()) {
+        err << "Индексатор уже работает с этой базой." << Qt::endl;
+        return 1;
+    }
+    lock.finish();
     if (!createTables(db, err))
         return 1;
 
     QSet<QString> seen;
+    QStringList scannedRoots;
+    bool scanComplete = true;
     int indexed = 0;
     int errors = 0;
     const QDir configDir = QFileInfo(path).absoluteDir();
     for (const QString &directory : directories) {
-        const QDir dir(configDir.absoluteFilePath(directory.trimmed()));
-        if (!dir.exists()) {
-            err << "Каталог не найден: " << dir.absolutePath() << Qt::endl;
+        const QFileInfo root(configDir.absoluteFilePath(directory.trimmed()));
+        const QString rootPath = root.canonicalFilePath();
+        if (!root.isDir() || !root.isReadable() || rootPath.isEmpty()) {
+            err << "Каталог недоступен: " << root.absoluteFilePath() << Qt::endl;
             ++errors;
+            scanComplete = false;
             continue;
         }
-        QDirIterator files(dir.absolutePath(), QDir::Files | QDir::NoSymLinks, QDirIterator::Subdirectories);
+        scannedRoots.append(rootPath);
+        QDirIterator files(rootPath, QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::NoSymLinks,
+                           QDirIterator::Subdirectories);
         while (files.hasNext()) {
             const QFileInfo info(files.next());
+            if (info.isDir()) {
+                if (!info.isReadable()) {
+                    err << "Подкаталог недоступен: " << info.absoluteFilePath() << Qt::endl;
+                    ++errors;
+                    scanComplete = false;
+                }
+                continue;
+            }
             const QString filePath = info.canonicalFilePath();
             if (!extensions.contains(info.suffix().toLower()) || filePath.isEmpty() || seen.contains(filePath))
                 continue;
@@ -178,6 +276,15 @@ int main(int argc, char *argv[])
             }
         }
     }
+    qsizetype removed = 0;
+    QString cleanupError;
+    if (!scanComplete) {
+        err << "Очистка индекса пропущена: обход завершён не полностью." << Qt::endl;
+    } else if (!removeStaleDocuments(db, scannedRoots, seen, removed, cleanupError)) {
+        err << "Не удалось очистить индекс: " << cleanupError << Qt::endl;
+        ++errors;
+    }
+    out << "Удалено из индекса: " << removed << Qt::endl;
     out << "Проиндексировано: " << indexed << ", ошибок: " << errors << Qt::endl;
     return errors == 0 ? 0 : 1;
 }

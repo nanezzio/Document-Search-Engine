@@ -4,7 +4,6 @@
 #include <QApplication>
 #include <QFileInfo>
 #include <QMessageBox>
-#include <QSqlError>
 
 int main(int argc, char *argv[])
 {
@@ -15,14 +14,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    const auto db = connectDatabase(path);
-    if (!db.isOpen()) {
-        QMessageBox::critical(nullptr, "Ошибка подключения",
-                              "Проверь настройки PostgreSQL в config.ini.\n\n" + db.lastError().text());
-        return 1;
-    }
-
-    MainWindow window(db);
+    MainWindow window(path);
     window.show();
     return app.exec();
 }

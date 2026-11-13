@@ -65,6 +65,7 @@
     </item>
    </layout>
   </widget>
+  <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <tabstops><tabstop>queryEdit</tabstop><tabstop>searchButton</tabstop><tabstop>resultsEdit</tabstop></tabstops>
  <resources/>
